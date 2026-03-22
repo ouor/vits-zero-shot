@@ -31,6 +31,8 @@ The runtime pipeline in this repository does not import or execute code from `./
 uv sync
 ```
 
+The project targets Python 3.11 because the current `faster-qwen3-tts` dependency chain pulls `onnxruntime`, which does not provide Python 3.10 wheels for this environment.
+
 ## Usage
 
 The main entry point will be:

@@ -7,7 +7,7 @@ name = "voice-trainer"
 version = "0.1.0"
 description = "Single-sample voice cloning, speaker filtering, and local VITS training pipeline."
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.13"
 dependencies = [
   "cn2an",
   "cython",
