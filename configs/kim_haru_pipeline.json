@@ -1,0 +1,31 @@
+{
+  "run_name": "kim_haru_v1",
+  "reference": {
+    "audio_path": "sample/voice/kim_haru.wav",
+    "text_path": "sample/voice/kim_haru.txt",
+    "language": "Korean"
+  },
+  "generation": {
+    "candidate_count": 600,
+    "selection_count": 300,
+    "model_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    "temperature": 0.9,
+    "top_k": 50,
+    "repetition_penalty": 1.05,
+    "xvec_only": false,
+    "non_streaming_mode": false,
+    "max_new_tokens": 1024
+  },
+  "speaker_ranking": {
+    "model_source": "speechbrain/spkrec-ecapa-voxceleb",
+    "embedding_sample_rate": 16000
+  },
+  "vits": {
+    "config_template": ".ref/vits/configs/korean_base.json",
+    "target_sample_rate": 22050,
+    "train_split_ratio": 0.95,
+    "batch_size": 16,
+    "epochs": 10000
+  },
+  "output_root": "runs"
+}
