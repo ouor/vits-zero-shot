@@ -4,7 +4,12 @@ from pathlib import Path
 
 from .audio import load_text, write_json
 from .backends import get_backend
-from .config import load_config, resolve_from_root
+from .config import (
+    get_backend_config,
+    get_training_backend_name,
+    load_config,
+    resolve_from_root,
+)
 from .generation import generate_candidates
 from .ranking import rank_candidates
 from .text_corpus import generate_sentences
@@ -12,8 +17,9 @@ from .text_corpus import generate_sentences
 
 def run_pipeline(config_path: str | Path) -> dict:
     config = load_config(config_path)
-    backend_name = config.get("training_backend", "vits")
+    backend_name = get_training_backend_name(config)
     backend = get_backend(backend_name)
+    backend_config = get_backend_config(config, backend_name)
 
     run_root = resolve_from_root(config["output_root"]) / config["run_name"]
     reference_audio = resolve_from_root(config["reference"]["audio_path"])
@@ -55,9 +61,9 @@ def run_pipeline(config_path: str | Path) -> dict:
     asset_info = backend.prepare_training_assets(
         run_root=run_root,
         selected_candidates=selected,
-        trainer_config=config["vits"],
+        trainer_config=backend_config,
     )
-    backend.run_training(asset_info=asset_info, trainer_config=config["vits"])
+    backend.run_training(asset_info=asset_info, trainer_config=backend_config)
 
     summary = {
         "run_root": str(run_root),
