@@ -1,10 +1,12 @@
 # Voice Trainer Pipeline
 
-This repository builds a reproducible single-sample voice-training pipeline around three local reference repositories:
+This repository builds a reproducible single-sample voice-training pipeline guided by three local reference repositories:
 
-- `./.ref/faster-qwen3-tts`: voice cloning candidate generation
-- `./.ref/speechbrain`: speaker embedding extraction and ranking
-- `./.ref/vits`: small TTS model preprocessing and training
+- `./.ref/faster-qwen3-tts`: design reference for voice cloning candidate generation
+- `./.ref/speechbrain`: design reference for speaker embedding extraction and ranking
+- `./.ref/vits`: design reference for small TTS preprocessing and training
+
+The runtime pipeline in this repository does not import or execute code from `./.ref`.
 
 ## Pipeline
 

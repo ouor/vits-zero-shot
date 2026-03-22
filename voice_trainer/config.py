@@ -8,10 +8,6 @@ from pathlib import Path
 @dataclass(frozen=True)
 class PipelinePaths:
     root: Path
-    ref_root: Path
-    faster_qwen_root: Path
-    speechbrain_root: Path
-    vits_root: Path
 
 
 def repo_root() -> Path:
@@ -26,14 +22,7 @@ def load_config(path: str | Path) -> dict:
 
 def resolve_paths() -> PipelinePaths:
     root = repo_root()
-    ref_root = root / ".ref"
-    return PipelinePaths(
-        root=root,
-        ref_root=ref_root,
-        faster_qwen_root=ref_root / "faster-qwen3-tts",
-        speechbrain_root=ref_root / "speechbrain",
-        vits_root=ref_root / "vits",
-    )
+    return PipelinePaths(root=root)
 
 
 def resolve_from_root(value: str | Path) -> Path:
