@@ -45,6 +45,11 @@ def export_vits_dataset(
     train_split_ratio: float,
     random_seed: int = 1234,
 ) -> dict:
+    if len(selected_candidates) < 2:
+        raise ValueError("VITS dataset export requires at least 2 selected candidates.")
+    if not 0.0 < train_split_ratio < 1.0:
+        raise ValueError("train_split_ratio must be between 0 and 1.")
+
     dataset_dir = output_dir / "dataset"
     wav_dir = dataset_dir / "wavs"
     wav_dir.mkdir(parents=True, exist_ok=True)
