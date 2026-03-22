@@ -146,10 +146,10 @@ def get_hparams(init=True):
   parser.add_argument('-c', '--config', type=str, default="./configs/base.json",
                       help='JSON file for configuration')
   parser.add_argument('-m', '--model', type=str, required=True,
-                      help='Model name')
+                      help='Model output directory')
   
   args = parser.parse_args()
-  model_dir = os.path.join("../drive/MyDrive", args.model)
+  model_dir = os.path.abspath(args.model)
 
   if not os.path.exists(model_dir):
     os.makedirs(model_dir)
