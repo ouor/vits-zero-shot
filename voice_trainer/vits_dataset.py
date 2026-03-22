@@ -135,6 +135,7 @@ def build_vits_config(
             "segment_size": 8192,
             "init_lr_ratio": 1,
             "warmup_epochs": 0,
+            "num_gpus": 1,
             "c_mel": 45,
             "c_kl": 1.0,
             "pretrained_generator": pretrained_generator,

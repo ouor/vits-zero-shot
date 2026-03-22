@@ -44,23 +44,31 @@ global_step = 0
 
 
 def main():
-  """Assume Single Node Multi GPUs Training Only"""
+  """Default to single-GPU training and allow opt-in DDP."""
   assert torch.cuda.is_available(), "CPU training is not allowed."
-
-  n_gpus = torch.cuda.device_count()
-  os.environ['MASTER_ADDR'] = 'localhost'
-  os.environ['MASTER_PORT'] = '8000'
 
   hps = utils.get_hparams()
   if hasattr(hps, "symbols"):
     vits_text.set_symbols(hps.symbols)
-  mp.spawn(run, nprocs=n_gpus, args=(n_gpus, hps,))
+
+  available_gpus = torch.cuda.device_count()
+  requested_gpus = max(1, int(getattr(hps.train, "num_gpus", 1)))
+  n_gpus = min(available_gpus, requested_gpus)
+
+  if n_gpus > 1:
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '8000'
+    mp.spawn(run, nprocs=n_gpus, args=(n_gpus, hps,))
+    return
+
+  run(0, 1, hps)
 
 
 def run(rank, n_gpus, hps):
   global global_step
   if hasattr(hps, "symbols"):
     vits_text.set_symbols(hps.symbols)
+  use_ddp = n_gpus > 1
   if rank == 0:
     logger = utils.get_logger(hps.model_dir)
     logger.info(hps)
@@ -68,24 +76,36 @@ def run(rank, n_gpus, hps):
     writer = SummaryWriter(log_dir=hps.model_dir)
     writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
 
-  dist.init_process_group(backend='nccl', init_method='env://', world_size=n_gpus, rank=rank)
   torch.manual_seed(hps.train.seed)
   torch.cuda.set_device(rank)
+  if use_ddp:
+    dist.init_process_group(backend='nccl', init_method='env://', world_size=n_gpus, rank=rank)
 
   train_dataset = TextAudioSpeakerLoader(hps.data.training_files, hps.data)
-  train_sampler = DistributedBucketSampler(
-      train_dataset,
-      hps.train.batch_size,
-      [32,300,400,500,600,700,800,900,1000],
-      num_replicas=n_gpus,
-      rank=rank,
-      shuffle=True)
   collate_fn = TextAudioSpeakerCollate()
-  train_loader = DataLoader(train_dataset, num_workers=8, shuffle=False, pin_memory=True,
-      collate_fn=collate_fn, batch_sampler=train_sampler)
+  if use_ddp:
+    train_sampler = DistributedBucketSampler(
+        train_dataset,
+        hps.train.batch_size,
+        [32,300,400,500,600,700,800,900,1000],
+        num_replicas=n_gpus,
+        rank=rank,
+        shuffle=True)
+    train_loader = DataLoader(train_dataset, num_workers=8, shuffle=False, pin_memory=True,
+        collate_fn=collate_fn, batch_sampler=train_sampler)
+  else:
+    train_loader = DataLoader(
+        train_dataset,
+        num_workers=0,
+        shuffle=True,
+        pin_memory=True,
+        batch_size=hps.train.batch_size,
+        drop_last=False,
+        collate_fn=collate_fn,
+    )
   if rank == 0:
     eval_dataset = TextAudioSpeakerLoader(hps.data.validation_files, hps.data)
-    eval_loader = DataLoader(eval_dataset, num_workers=8, shuffle=False,
+    eval_loader = DataLoader(eval_dataset, num_workers=0, shuffle=False,
         batch_size=hps.train.batch_size, pin_memory=True,
         drop_last=False, collate_fn=collate_fn)
 
@@ -106,8 +126,9 @@ def run(rank, n_gpus, hps):
       hps.train.learning_rate, 
       betas=hps.train.betas, 
       eps=hps.train.eps)
-  net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
-  net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
+  if use_ddp:
+    net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
+    net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
 
   epoch_str = 1
   global_step = 0
@@ -141,6 +162,9 @@ def run(rank, n_gpus, hps):
     scheduler_g.step()
     scheduler_d.step()
 
+  if use_ddp:
+    dist.destroy_process_group()
+
 
 def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers):
   net_g, net_d = nets
@@ -150,7 +174,8 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   if writers is not None:
     writer, writer_eval = writers
 
-  train_loader.batch_sampler.set_epoch(epoch)
+  if hasattr(train_loader, "batch_sampler") and hasattr(train_loader.batch_sampler, "set_epoch"):
+    train_loader.batch_sampler.set_epoch(epoch)
   global global_step
 
   net_g.train()
