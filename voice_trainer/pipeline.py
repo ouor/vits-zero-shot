@@ -3,16 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from .audio import load_text, write_json
+from .backends import get_backend
 from .config import load_config, resolve_from_root
 from .generation import generate_candidates
 from .ranking import rank_candidates
 from .text_corpus import generate_sentences
-from .training import run_training_command
-from .vits_dataset import build_vits_config, export_vits_dataset
 
 
 def run_pipeline(config_path: str | Path) -> dict:
     config = load_config(config_path)
+    backend_name = config.get("training_backend", "vits")
+    backend = get_backend(backend_name)
 
     run_root = resolve_from_root(config["output_root"]) / config["run_name"]
     reference_audio = resolve_from_root(config["reference"]["audio_path"])
@@ -51,37 +52,21 @@ def run_pipeline(config_path: str | Path) -> dict:
         device=config["speaker_ranking"]["device"],
     )
 
-    dataset_info = export_vits_dataset(
+    asset_info = backend.prepare_training_assets(
+        run_root=run_root,
         selected_candidates=selected,
-        output_dir=run_root / "vits_data",
-        target_sample_rate=config["vits"]["target_sample_rate"],
-        train_split_ratio=config["vits"]["train_split_ratio"],
+        trainer_config=config["vits"],
     )
-
-    vits_config_path = run_root / "vits_data" / "vits_config.json"
-    build_vits_config(
-        output_path=vits_config_path,
-        train_filelist=dataset_info["train_filelist"],
-        val_filelist=dataset_info["val_filelist"],
-        batch_size=config["vits"]["batch_size"],
-        epochs=config["vits"]["epochs"],
-        sampling_rate=config["vits"]["target_sample_rate"],
-        pretrained_generator=config["vits"].get("pretrained_generator", ""),
-        pretrained_discriminator=config["vits"].get("pretrained_discriminator", ""),
-    )
-
-    run_training_command(
-        training_command=config["vits"]["training_command"],
-        config_path=vits_config_path,
-        output_dir=run_root / "training",
-    )
+    backend.run_training(asset_info=asset_info, trainer_config=config["vits"])
 
     summary = {
         "run_root": str(run_root),
+        "training_backend": backend.name,
         "prompt_count": len(prompts),
         "candidate_count": len(candidates),
         "selected_count": len(selected),
-        "vits_config_path": str(vits_config_path),
+        "training_asset_dir": asset_info["dataset_dir"],
+        "trainer_config_path": asset_info["config_path"],
     }
     write_json(run_root / "run_summary.json", summary)
     return summary
