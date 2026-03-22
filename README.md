@@ -33,5 +33,5 @@ The main entry point will be:
 python3 scripts/run_pipeline.py --config configs/kim_haru_pipeline.json
 ```
 
-By default the repository trains its own compact VITS-style model locally.
+By default the repository trains the vendored local full VITS implementation.
 `vits.training_command` is optional and only needed if you want to replace that final trainer with a different command.
