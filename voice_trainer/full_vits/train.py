@@ -109,19 +109,24 @@ def run(rank, n_gpus, hps):
   net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
   net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
 
-  try:
-    _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g)
-    _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d)
+  epoch_str = 1
+  global_step = 0
+
+  generator_resume_path = utils.maybe_latest_checkpoint_path(hps.model_dir, "G_*.pth")
+  discriminator_resume_path = utils.maybe_latest_checkpoint_path(hps.model_dir, "D_*.pth")
+  pretrained_g = getattr(hps.train, "pretrained_generator", "")
+  pretrained_d = getattr(hps.train, "pretrained_discriminator", "")
+
+  if generator_resume_path:
+    _, _, _, epoch_str = utils.load_checkpoint(generator_resume_path, net_g, optim_g)
     global_step = (epoch_str - 1) * len(train_loader)
-  except:
-    epoch_str = 1
-    global_step = 0
-    pretrained_g = getattr(hps.train, "pretrained_generator", "")
-    pretrained_d = getattr(hps.train, "pretrained_discriminator", "")
-    if pretrained_g:
-      utils.load_model_checkpoint(pretrained_g, net_g)
-    if pretrained_d:
-      utils.load_model_checkpoint(pretrained_d, net_d)
+  elif pretrained_g:
+    utils.load_model_checkpoint(pretrained_g, net_g)
+
+  if discriminator_resume_path:
+    _, _, _, _ = utils.load_checkpoint(discriminator_resume_path, net_d, optim_d)
+  elif pretrained_d:
+    utils.load_model_checkpoint(pretrained_d, net_d)
 
   scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)
   scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)

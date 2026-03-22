@@ -105,6 +105,14 @@ def latest_checkpoint_path(dir_path, regex="G_*.pth"):
   return x
 
 
+def maybe_latest_checkpoint_path(dir_path, regex="G_*.pth"):
+  f_list = glob.glob(os.path.join(dir_path, regex))
+  if not f_list:
+    return None
+  f_list.sort(key=lambda f: int("".join(filter(str.isdigit, f))))
+  return f_list[-1]
+
+
 def plot_spectrogram_to_numpy(spectrogram):
   global MATPLOTLIB_FLAG
   if not MATPLOTLIB_FLAG:
