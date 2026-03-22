@@ -15,7 +15,8 @@ def load_text(path: str | Path) -> str:
 
 
 def load_waveform(path: str | Path, sample_rate: int | None = None) -> tuple[torch.Tensor, int]:
-    waveform, sr = torchaudio.load(str(path))
+    audio, sr = sf.read(str(path), always_2d=True)
+    waveform = torch.from_numpy(audio.T).float()
     if waveform.shape[0] > 1:
         waveform = waveform.mean(dim=0, keepdim=True)
     if sample_rate is not None and sr != sample_rate:
