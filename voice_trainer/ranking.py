@@ -4,13 +4,25 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
-from speechbrain.inference.classifiers import EncoderClassifier
 
 from .audio import load_waveform, write_json, write_jsonl
 
 
+def _load_encoder_classifier():
+    import torchaudio
+
+    if not hasattr(torchaudio, "list_audio_backends"):
+        torchaudio.list_audio_backends = lambda: []  # type: ignore[attr-defined]
+    if not hasattr(torchaudio, "set_audio_backend"):
+        torchaudio.set_audio_backend = lambda backend: None  # type: ignore[attr-defined]
+
+    from speechbrain.inference.classifiers import EncoderClassifier
+
+    return EncoderClassifier
+
+
 def _compute_embedding(
-    classifier: EncoderClassifier,
+    classifier,
     audio_path: Path,
     sample_rate: int,
 ) -> torch.Tensor:
@@ -31,6 +43,7 @@ def rank_candidates(
 ) -> list[dict]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    EncoderClassifier = _load_encoder_classifier()
     classifier = EncoderClassifier.from_hparams(
         source=model_source,
         run_opts={"device": device},
