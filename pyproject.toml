@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "voice-trainer"
+version = "0.1.0"
+description = "Single-sample voice cloning, speaker filtering, and local VITS training pipeline."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "cn2an",
+  "cython",
+  "faster-qwen3-tts",
+  "jamo",
+  "jieba",
+  "ko-pron",
+  "librosa",
+  "matplotlib",
+  "num-thai",
+  "numpy",
+  "opencc",
+  "protobuf",
+  "pypinyin",
+  "pyopenjtalk",
+  "scipy",
+  "soundfile",
+  "speechbrain",
+  "tensorboard",
+  "torch",
+  "torchaudio",
+  "unidecode",
+]
+
+[project.scripts]
+voice-trainer-run = "voice_trainer.pipeline_cli:main"
+voice-trainer-train-vits = "voice_trainer.vits_cli:main"
+voice-trainer-train-full-vits = "voice_trainer.full_vits_cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["voice_trainer"]

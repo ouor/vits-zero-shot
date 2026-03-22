@@ -25,12 +25,18 @@ The runtime pipeline in this repository does not import or execute code from `./
 - Candidate ranking uses SpeechBrain ECAPA embeddings and cosine similarity.
 - VITS is trained as a single-speaker model from the selected synthetic set.
 
+## Setup
+
+```bash
+uv sync
+```
+
 ## Usage
 
 The main entry point will be:
 
 ```bash
-python3 scripts/run_pipeline.py --config configs/kim_haru_pipeline.json
+uv run voice-trainer-run --config configs/kim_haru_pipeline.json
 ```
 
 By default the repository trains the vendored local full VITS implementation.
