@@ -5,6 +5,34 @@ from pathlib import Path
 
 from ..vits import text as vits_text
 
+_TAGGED_MULTILINGUAL_CLEANERS = {
+    "cjks_cleaners",
+    "cjke_cleaners",
+    "cjke_cleaners2",
+    "zh_ja_mixture_cleaners",
+    "chinese_dialect_cleaners",
+}
+
+_LANGUAGE_TAGS = {
+    "ko": "KO",
+    "kr": "KO",
+    "korean": "KO",
+    "en": "EN",
+    "english": "EN",
+    "ja": "JA",
+    "jp": "JA",
+    "japanese": "JA",
+    "zh": "ZH",
+    "cn": "ZH",
+    "chinese": "ZH",
+}
+
+_DEFAULT_KOREAN_SYMBOLS = [
+    "_", ",", ".", "!", "?", "…", "~", "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ",
+    "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ", "ㄲ", "ㄸ", "ㅃ", "ㅆ", "ㅉ", "ㅏ",
+    "ㅓ", "ㅗ", "ㅜ", "ㅡ", "ㅣ", "ㅐ", "ㅔ", " ",
+]
+
 
 def _write_filelist(path: Path, rows: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -13,13 +41,48 @@ def _write_filelist(path: Path, rows: list[str]) -> None:
             handle.write(row + "\n")
 
 
-def _write_cleaned_filelist(path: Path, cleaner_names: list[str], text_index: int = 2) -> Path:
+def _uses_tagged_multilingual_cleaners(cleaner_names: list[str]) -> bool:
+    return any(name in _TAGGED_MULTILINGUAL_CLEANERS for name in cleaner_names)
+
+
+def _adapt_text_for_cleaners(text: str, cleaner_names: list[str], language: str) -> str:
+    if not _uses_tagged_multilingual_cleaners(cleaner_names):
+        return text
+    tag = _LANGUAGE_TAGS.get(language.strip().lower())
+    if tag is None:
+        raise ValueError(f"Unsupported language for tagged multilingual cleaners: {language}")
+    return f"[{tag}]{text}[{tag}]"
+
+
+def _validate_cleaned_text(original_text: str, cleaned_text: str, symbols: list[str]) -> None:
+    symbol_set = set(symbols)
+    matched_symbol_count = sum(1 for symbol in cleaned_text if symbol in symbol_set)
+    if matched_symbol_count == 0:
+        raise ValueError(f"Cleaner removed all symbols from text: {original_text}")
+    min_expected = max(3, len(cleaned_text.replace(" ", "")) // 3)
+    if matched_symbol_count < min_expected:
+        raise ValueError(
+            "Cleaner output is not compatible with the configured symbols: "
+            f"{original_text} -> {cleaned_text}"
+        )
+
+
+def _write_cleaned_filelist(
+    path: Path,
+    cleaner_names: list[str],
+    language: str,
+    symbols: list[str],
+    text_index: int = 2,
+) -> Path:
     cleaned_path = Path(str(path) + ".cleaned")
     rows = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             parts = line.rstrip("\n").split("|")
-            parts[text_index] = vits_text._clean_text(parts[text_index], cleaner_names)
+            adapted_text = _adapt_text_for_cleaners(parts[text_index], cleaner_names, language)
+            cleaned_text = vits_text._clean_text(adapted_text, cleaner_names)
+            _validate_cleaned_text(parts[text_index], cleaned_text, symbols)
+            parts[text_index] = cleaned_text
             rows.append("|".join(parts))
     _write_filelist(cleaned_path, rows)
     return cleaned_path
@@ -52,10 +115,11 @@ def build_vits_config(
     pretrained_model = pretrained_config.get("model", {}) if pretrained_config else {}
     pretrained_symbols = pretrained_config.get("symbols") if pretrained_config else None
     pretrained_speakers = pretrained_config.get("speakers") if pretrained_config else None
+    symbols = pretrained_symbols if pretrained_symbols else _DEFAULT_KOREAN_SYMBOLS
     text_cleaners = pretrained_data.get("text_cleaners", ["korean_cleaners"])
     n_speakers = max(1, int(pretrained_data.get("n_speakers", 1)))
-    cleaned_train_filelist = _write_cleaned_filelist(Path(train_filelist), text_cleaners, language)
-    cleaned_val_filelist = _write_cleaned_filelist(Path(val_filelist), text_cleaners, language)
+    cleaned_train_filelist = _write_cleaned_filelist(Path(train_filelist), text_cleaners, language, symbols)
+    cleaned_val_filelist = _write_cleaned_filelist(Path(val_filelist), text_cleaners, language, symbols)
 
     config = {
         "train": {
@@ -113,11 +177,7 @@ def build_vits_config(
             "gin_channels": pretrained_model.get("gin_channels", 256),
         },
         "speakers": pretrained_speakers if pretrained_speakers else ["speaker0"],
-        "symbols": pretrained_symbols if pretrained_symbols else [
-            "_", ",", ".", "!", "?", "…", "~", "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ",
-            "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ", "ㄲ", "ㄸ", "ㅃ", "ㅆ", "ㅉ", "ㅏ",
-            "ㅓ", "ㅗ", "ㅜ", "ㅡ", "ㅣ", "ㅐ", "ㅔ", " ",
-        ],
+        "symbols": symbols,
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
