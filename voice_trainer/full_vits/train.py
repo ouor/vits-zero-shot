@@ -36,7 +36,7 @@ from .losses import (
   kl_loss
 )
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .text.symbols import symbols
+from . import text as vits_text
 
 
 torch.backends.cudnn.benchmark = True
@@ -52,11 +52,15 @@ def main():
   os.environ['MASTER_PORT'] = '8000'
 
   hps = utils.get_hparams()
+  if hasattr(hps, "symbols"):
+    vits_text.set_symbols(hps.symbols)
   mp.spawn(run, nprocs=n_gpus, args=(n_gpus, hps,))
 
 
 def run(rank, n_gpus, hps):
   global global_step
+  if hasattr(hps, "symbols"):
+    vits_text.set_symbols(hps.symbols)
   if rank == 0:
     logger = utils.get_logger(hps.model_dir)
     logger.info(hps)
@@ -86,7 +90,7 @@ def run(rank, n_gpus, hps):
         drop_last=False, collate_fn=collate_fn)
 
   net_g = SynthesizerTrn(
-      len(symbols),
+      len(vits_text.symbols),
       hps.data.filter_length // 2 + 1,
       hps.train.segment_size // hps.data.hop_length,
       n_speakers=hps.data.n_speakers,
