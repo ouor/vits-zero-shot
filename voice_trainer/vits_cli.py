@@ -1,19 +1,31 @@
 from __future__ import annotations
 
 import argparse
-import json
+import subprocess
+import sys
 
-from .vits_train import train_vits
+from .vits.runtime import ensure_monotonic_align_built
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train the local compact VITS-style model.")
+    parser = argparse.ArgumentParser(description="Train the vendored local VITS implementation.")
     parser.add_argument("--config", required=True, help="Path to the VITS JSON config.")
-    parser.add_argument("--output-dir", required=True, help="Directory for checkpoints and logs.")
+    parser.add_argument("--model-dir", required=True, help="Output directory for checkpoints and logs.")
     args = parser.parse_args()
 
-    summary = train_vits(args.config, args.output_dir)
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    ensure_monotonic_align_built()
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "voice_trainer.vits.train",
+            "-c",
+            args.config,
+            "-m",
+            args.model_dir,
+        ],
+        check=True,
+    )
 
 
 if __name__ == "__main__":

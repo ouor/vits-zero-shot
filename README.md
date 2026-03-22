@@ -23,7 +23,7 @@ The runtime pipeline in this repository does not import or execute code from `./
 - Input is a single Korean reference clip plus one Korean transcript.
 - Candidate prompts are generated locally from templates in this repository.
 - Candidate ranking uses SpeechBrain ECAPA embeddings and cosine similarity.
-- The default backend is the vendored local full VITS implementation.
+- The default backend is the vendored local VITS implementation.
 - The current VITS path uses the multi-speaker model structure while assigning a single selected speaker id in the exported corpus.
 
 ## Setup
@@ -62,5 +62,5 @@ The pipeline still accepts the legacy top-level `vits` block, but new configs sh
 
 ## Backends
 
-By default the repository trains the vendored local full VITS implementation through the `vits` backend.
+By default the repository trains the vendored local VITS implementation through the `vits` backend.
 `backends.vits.training_command` is optional and only needed if you want to replace that final trainer with a different command.

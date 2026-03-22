@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ..full_vits import text as vits_text
+from ..vits import text as vits_text
 
 
 def _write_filelist(path: Path, rows: list[str]) -> None:

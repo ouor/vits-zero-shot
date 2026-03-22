@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from .audio import write_json
-from .full_vits.runtime import ensure_monotonic_align_built
+from .vits.runtime import ensure_monotonic_align_built
 
 
 def run_training_command(
@@ -20,7 +20,7 @@ def run_training_command(
         default_command = [
             sys.executable,
             "-m",
-            "voice_trainer.full_vits.train",
+            "voice_trainer.vits.train",
             "-c",
             str(config_path),
             "-m",
