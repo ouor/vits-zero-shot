@@ -19,6 +19,7 @@ def export_selected_corpus(
     output_dir: Path,
     target_sample_rate: int,
     train_split_ratio: float,
+    language: str,
     random_seed: int = 1234,
 ) -> dict:
     if len(selected_candidates) < 2:
@@ -42,6 +43,7 @@ def export_selected_corpus(
             {
                 "id": candidate["id"],
                 "text": candidate["text"],
+                "language": language,
                 "speaker_similarity": candidate["speaker_similarity"],
                 "wav_path": str(wav_path),
                 "speaker_id": 0,
@@ -73,4 +75,5 @@ def export_selected_corpus(
         "val_filelist": str(val_filelist),
         "manifest_path": str(manifest_path),
         "item_count": len(manifest),
+        "language": language,
     }

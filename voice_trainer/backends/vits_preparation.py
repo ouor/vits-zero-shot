@@ -45,6 +45,7 @@ def build_vits_config(
     sampling_rate: int,
     pretrained_generator: str = "",
     pretrained_discriminator: str = "",
+    language: str,
 ) -> dict:
     pretrained_config = load_pretrained_vits_config(pretrained_generator)
     pretrained_data = pretrained_config.get("data", {}) if pretrained_config else {}
@@ -53,8 +54,8 @@ def build_vits_config(
     pretrained_speakers = pretrained_config.get("speakers") if pretrained_config else None
     text_cleaners = pretrained_data.get("text_cleaners", ["korean_cleaners"])
     n_speakers = max(1, int(pretrained_data.get("n_speakers", 1)))
-    cleaned_train_filelist = _write_cleaned_filelist(Path(train_filelist), text_cleaners)
-    cleaned_val_filelist = _write_cleaned_filelist(Path(val_filelist), text_cleaners)
+    cleaned_train_filelist = _write_cleaned_filelist(Path(train_filelist), text_cleaners, language)
+    cleaned_val_filelist = _write_cleaned_filelist(Path(val_filelist), text_cleaners, language)
 
     config = {
         "train": {

@@ -20,13 +20,14 @@ def run_pipeline(config_path: str | Path) -> dict:
     backend_name = get_training_backend_name(config)
     backend = get_backend(backend_name)
     backend_config = get_backend_config(config, backend_name)
+    reference_language = config["reference"]["language"]
 
     run_root = resolve_from_root(config["output_root"]) / config["run_name"]
     reference_audio = resolve_from_root(config["reference"]["audio_path"])
     reference_text = load_text(resolve_from_root(config["reference"]["text_path"]))
 
     prompts = generate_sentences(
-        config["reference"]["language"],
+        reference_language,
         config["generation"]["candidate_count"],
     )
     prompt_path = run_root / "prompts.json"
@@ -38,7 +39,7 @@ def run_pipeline(config_path: str | Path) -> dict:
         device=config["generation"]["device"],
         reference_audio=reference_audio,
         reference_text=reference_text,
-        language=config["reference"]["language"],
+        language=reference_language,
         texts=prompts,
         temperature=config["generation"]["temperature"],
         top_k=config["generation"]["top_k"],
@@ -62,6 +63,7 @@ def run_pipeline(config_path: str | Path) -> dict:
         run_root=run_root,
         selected_candidates=selected,
         trainer_config=backend_config,
+        language=reference_language,
     )
     backend.run_training(asset_info=asset_info, trainer_config=backend_config)
 
