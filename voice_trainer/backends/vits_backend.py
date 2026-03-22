@@ -38,6 +38,7 @@ class VitsBackend:
             pretrained_generator=trainer_config.get("pretrained_generator", ""),
             pretrained_discriminator=trainer_config.get("pretrained_discriminator", ""),
             language=language,
+            speaker_name=run_root.name,
         )
 
         return {

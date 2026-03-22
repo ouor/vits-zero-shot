@@ -109,15 +109,15 @@ def build_vits_config(
     pretrained_generator: str = "",
     pretrained_discriminator: str = "",
     language: str,
+    speaker_name: str,
 ) -> dict:
     pretrained_config = load_pretrained_vits_config(pretrained_generator)
     pretrained_data = pretrained_config.get("data", {}) if pretrained_config else {}
     pretrained_model = pretrained_config.get("model", {}) if pretrained_config else {}
     pretrained_symbols = pretrained_config.get("symbols") if pretrained_config else None
-    pretrained_speakers = pretrained_config.get("speakers") if pretrained_config else None
     symbols = pretrained_symbols if pretrained_symbols else _DEFAULT_KOREAN_SYMBOLS
     text_cleaners = pretrained_data.get("text_cleaners", ["korean_cleaners"])
-    n_speakers = max(1, int(pretrained_data.get("n_speakers", 1)))
+    n_speakers = 1
     cleaned_train_filelist = _write_cleaned_filelist(Path(train_filelist), text_cleaners, language, symbols)
     cleaned_val_filelist = _write_cleaned_filelist(Path(val_filelist), text_cleaners, language, symbols)
 
@@ -176,7 +176,7 @@ def build_vits_config(
             "use_spectral_norm": pretrained_model.get("use_spectral_norm", False),
             "gin_channels": pretrained_model.get("gin_channels", 256),
         },
-        "speakers": pretrained_speakers if pretrained_speakers else ["speaker0"],
+        "speakers": [speaker_name],
         "symbols": symbols,
     }
 
