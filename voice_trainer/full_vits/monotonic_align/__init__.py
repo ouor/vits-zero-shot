@@ -16,8 +16,9 @@ def _maximum_path_python(neg_cent, mask):
 
   batch_size = values.shape[0]
   for batch_index in range(batch_size):
-    t_t = int(masks[batch_index].sum(axis=1)[:, 0].max())
-    t_s = int(masks[batch_index].sum(axis=0)[0].max())
+    current_mask = masks[batch_index]
+    t_t = int(current_mask[:, 0].sum())
+    t_s = int(current_mask[0].sum())
     if t_t <= 0 or t_s <= 0:
       continue
 
