@@ -1,6 +1,9 @@
 cn2an
 cython
+eng_to_ipa
 faster-qwen3-tts
+inflect
+indic-transliteration
 jamo
 jieba
 ko_pron
