@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import soundfile as sf
 import torch
 import torchaudio
@@ -26,7 +27,13 @@ def load_waveform(path: str | Path, sample_rate: int | None = None) -> tuple[tor
 def save_waveform(path: str | Path, waveform: torch.Tensor, sample_rate: int) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    sf.write(str(target), waveform.squeeze(0).cpu().numpy(), sample_rate, subtype="PCM_16")
+    if isinstance(waveform, torch.Tensor):
+        audio = waveform.detach().cpu().numpy()
+    else:
+        audio = np.asarray(waveform)
+    if audio.ndim > 1:
+        audio = np.squeeze(audio)
+    sf.write(str(target), audio, sample_rate, subtype="PCM_16")
 
 
 def write_json(path: str | Path, payload: dict) -> None:
