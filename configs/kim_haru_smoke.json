@@ -27,6 +27,8 @@
     "train_split_ratio": 0.8,
     "batch_size": 2,
     "epochs": 2,
+    "pretrained_generator": "",
+    "pretrained_discriminator": "",
     "training_command": []
   },
   "output_root": "runs"

@@ -43,6 +43,27 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
   return model, optimizer, learning_rate, iteration
 
 
+def load_model_checkpoint(checkpoint_path, model):
+  assert os.path.isfile(checkpoint_path)
+  checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
+  iteration = checkpoint_dict.get('iteration', 0)
+  saved_state_dict = checkpoint_dict['model']
+  if hasattr(model, 'module'):
+    state_dict = model.module.state_dict()
+  else:
+    state_dict = model.state_dict()
+  new_state_dict = {}
+  for k, v in state_dict.items():
+    new_state_dict[k] = saved_state_dict.get(k, v)
+  if hasattr(model, 'module'):
+    model.module.load_state_dict(new_state_dict)
+  else:
+    model.load_state_dict(new_state_dict)
+  logger.info("Loaded model weights from '{}' (iteration {})".format(
+    checkpoint_path, iteration))
+  return model, iteration
+
+
 def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path):
   logger.info("Saving model and optimizer state at iteration {} to {}".format(
     iteration, checkpoint_path))

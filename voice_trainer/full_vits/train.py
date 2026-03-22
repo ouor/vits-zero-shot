@@ -111,6 +111,12 @@ def run(rank, n_gpus, hps):
   except:
     epoch_str = 1
     global_step = 0
+    pretrained_g = getattr(hps.train, "pretrained_generator", "")
+    pretrained_d = getattr(hps.train, "pretrained_discriminator", "")
+    if pretrained_g:
+      utils.load_model_checkpoint(pretrained_g, net_g)
+    if pretrained_d:
+      utils.load_model_checkpoint(pretrained_d, net_d)
 
   scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)
   scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)

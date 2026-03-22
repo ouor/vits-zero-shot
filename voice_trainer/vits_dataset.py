@@ -79,6 +79,8 @@ def build_vits_config(
     batch_size: int,
     epochs: int,
     sampling_rate: int,
+    pretrained_generator: str = "",
+    pretrained_discriminator: str = "",
 ) -> dict:
     config = {
         "train": {
@@ -96,7 +98,9 @@ def build_vits_config(
             "init_lr_ratio": 1,
             "warmup_epochs": 0,
             "c_mel": 45,
-            "c_kl": 1.0
+            "c_kl": 1.0,
+            "pretrained_generator": pretrained_generator,
+            "pretrained_discriminator": pretrained_discriminator
         },
         "data": {
             "training_files": train_filelist,

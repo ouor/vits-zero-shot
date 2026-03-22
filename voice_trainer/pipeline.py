@@ -65,6 +65,8 @@ def run_pipeline(config_path: str | Path) -> dict:
         batch_size=config["vits"]["batch_size"],
         epochs=config["vits"]["epochs"],
         sampling_rate=config["vits"]["target_sample_rate"],
+        pretrained_generator=config["vits"].get("pretrained_generator", ""),
+        pretrained_discriminator=config["vits"].get("pretrained_discriminator", ""),
     )
 
     run_training_command(
