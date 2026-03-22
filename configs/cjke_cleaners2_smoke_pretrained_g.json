@@ -1,5 +1,6 @@
 {
   "run_name": "cjke_cleaners2_smoke_pretrained_g",
+  "training_backend": "vits",
   "reference": {
     "audio_path": "sample/voice/kim_haru.wav",
     "text_path": "sample/voice/kim_haru.txt",
@@ -22,14 +23,16 @@
     "embedding_sample_rate": 16000,
     "device": "cuda"
   },
-  "vits": {
-    "target_sample_rate": 22050,
-    "train_split_ratio": 0.8,
-    "batch_size": 2,
-    "epochs": 2,
-    "pretrained_generator": "sample/pretrained/cjke_cleaners2/G_0.pth",
-    "pretrained_discriminator": "",
-    "training_command": []
+  "backends": {
+    "vits": {
+      "target_sample_rate": 22050,
+      "train_split_ratio": 0.8,
+      "batch_size": 2,
+      "epochs": 2,
+      "pretrained_generator": "sample/pretrained/cjke_cleaners2/G_0.pth",
+      "pretrained_discriminator": "",
+      "training_command": []
+    }
   },
   "output_root": "runs"
 }
