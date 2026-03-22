@@ -5,6 +5,7 @@ import random
 from pathlib import Path
 
 from .audio import load_waveform, save_waveform, write_json
+from .full_vits import text as vits_text
 
 
 def _write_filelist(path: Path, rows: list[str]) -> None:
@@ -12,6 +13,18 @@ def _write_filelist(path: Path, rows: list[str]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(row + "\n")
+
+
+def _write_cleaned_filelist(path: Path, cleaner_names: list[str], text_index: int = 2) -> Path:
+    cleaned_path = Path(str(path) + ".cleaned")
+    rows = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            parts = line.rstrip("\n").split("|")
+            parts[text_index] = vits_text._clean_text(parts[text_index], cleaner_names)
+            rows.append("|".join(parts))
+    _write_filelist(cleaned_path, rows)
+    return cleaned_path
 
 
 def _load_pretrained_config(pretrained_generator: str) -> dict | None:
@@ -97,7 +110,10 @@ def build_vits_config(
     pretrained_model = pretrained_config.get("model", {}) if pretrained_config else {}
     pretrained_symbols = pretrained_config.get("symbols") if pretrained_config else None
     pretrained_speakers = pretrained_config.get("speakers") if pretrained_config else None
+    text_cleaners = pretrained_data.get("text_cleaners", ["korean_cleaners"])
     n_speakers = max(1, int(pretrained_data.get("n_speakers", 1)))
+    cleaned_train_filelist = _write_cleaned_filelist(Path(train_filelist), text_cleaners)
+    cleaned_val_filelist = _write_cleaned_filelist(Path(val_filelist), text_cleaners)
 
     config = {
         "train": {
@@ -120,9 +136,9 @@ def build_vits_config(
             "pretrained_discriminator": pretrained_discriminator
         },
         "data": {
-            "training_files": train_filelist,
-            "validation_files": val_filelist,
-            "text_cleaners": pretrained_data.get("text_cleaners", ["korean_cleaners"]),
+            "training_files": str(cleaned_train_filelist),
+            "validation_files": str(cleaned_val_filelist),
+            "text_cleaners": text_cleaners,
             "max_wav_value": 32768.0,
             "sampling_rate": sampling_rate,
             "filter_length": 1024,
@@ -133,7 +149,7 @@ def build_vits_config(
             "mel_fmax": None,
             "add_blank": pretrained_data.get("add_blank", True),
             "n_speakers": n_speakers,
-            "cleaned_text": pretrained_data.get("cleaned_text", False)
+            "cleaned_text": True
         },
         "model": {
             "inter_channels": pretrained_model.get("inter_channels", 128),
