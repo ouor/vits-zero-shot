@@ -27,6 +27,7 @@ def run_pipeline(config_path: str | Path) -> dict:
         paths=paths,
         output_dir=run_root / "generation",
         model_id=config["generation"]["model_id"],
+        device=config["generation"]["device"],
         reference_audio=reference_audio,
         reference_text=reference_text,
         language=config["reference"]["language"],
@@ -46,6 +47,7 @@ def run_pipeline(config_path: str | Path) -> dict:
         model_source=config["speaker_ranking"]["model_source"],
         sample_rate=config["speaker_ranking"]["embedding_sample_rate"],
         selection_count=config["generation"]["selection_count"],
+        device=config["speaker_ranking"]["device"],
     )
 
     dataset_info = export_vits_dataset(

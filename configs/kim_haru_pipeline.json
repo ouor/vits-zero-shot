@@ -9,6 +9,7 @@
     "candidate_count": 600,
     "selection_count": 300,
     "model_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    "device": "cuda",
     "temperature": 0.9,
     "top_k": 50,
     "repetition_penalty": 1.05,
@@ -18,7 +19,8 @@
   },
   "speaker_ranking": {
     "model_source": "speechbrain/spkrec-ecapa-voxceleb",
-    "embedding_sample_rate": 16000
+    "embedding_sample_rate": 16000,
+    "device": "cuda"
   },
   "vits": {
     "target_sample_rate": 22050,

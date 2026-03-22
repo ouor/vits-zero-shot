@@ -1,0 +1,5 @@
+faster-qwen3-tts
+soundfile
+speechbrain
+torch
+torchaudio

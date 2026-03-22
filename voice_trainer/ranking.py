@@ -27,7 +27,7 @@ def rank_candidates(
     model_source: str,
     sample_rate: int,
     selection_count: int,
-    device: str = "cpu",
+    device: str = "cuda",
 ) -> list[dict]:
     output_dir.mkdir(parents=True, exist_ok=True)
 

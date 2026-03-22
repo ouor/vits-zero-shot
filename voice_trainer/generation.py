@@ -11,6 +11,7 @@ def generate_candidates(
     paths: PipelinePaths,
     output_dir: Path,
     model_id: str,
+    device: str,
     reference_audio: Path,
     reference_text: str,
     language: str,
@@ -23,13 +24,18 @@ def generate_candidates(
     max_new_tokens: int,
 ) -> list[dict]:
     del paths
+    import torch
     from faster_qwen3_tts import FasterQwen3TTS  # pylint: disable=import-error
 
     output_dir.mkdir(parents=True, exist_ok=True)
     wav_dir = output_dir / "audio"
     wav_dir.mkdir(parents=True, exist_ok=True)
 
-    model = FasterQwen3TTS.from_pretrained(model_id)
+    model = FasterQwen3TTS.from_pretrained(
+        model_id,
+        device=device,
+        dtype=torch.bfloat16,
+    )
     manifest = []
 
     for index, text in enumerate(texts, start=1):
