@@ -14,6 +14,16 @@ def _write_filelist(path: Path, rows: list[str]) -> None:
             handle.write(row + "\n")
 
 
+def _load_pretrained_config(pretrained_generator: str) -> dict | None:
+    if not pretrained_generator:
+        return None
+    config_path = Path(pretrained_generator).resolve().parent / "config.json"
+    if not config_path.exists():
+        return None
+    with config_path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def export_vits_dataset(
     *,
     selected_candidates: list[dict],
@@ -33,7 +43,7 @@ def export_vits_dataset(
         filename = f"sample_{index:04d}.wav"
         wav_path = wav_dir / filename
         save_waveform(wav_path, waveform, target_sample_rate)
-        rows.append(f"{wav_path}|{candidate['text']}")
+        rows.append(f"{wav_path}|0|{candidate['text']}")
         manifest.append(
             {
                 "id": candidate["id"],
@@ -82,6 +92,13 @@ def build_vits_config(
     pretrained_generator: str = "",
     pretrained_discriminator: str = "",
 ) -> dict:
+    pretrained_config = _load_pretrained_config(pretrained_generator)
+    pretrained_data = pretrained_config.get("data", {}) if pretrained_config else {}
+    pretrained_model = pretrained_config.get("model", {}) if pretrained_config else {}
+    pretrained_symbols = pretrained_config.get("symbols") if pretrained_config else None
+    pretrained_speakers = pretrained_config.get("speakers") if pretrained_config else None
+    n_speakers = max(1, int(pretrained_data.get("n_speakers", 1)))
+
     config = {
         "train": {
             "log_interval": 200,
@@ -105,7 +122,7 @@ def build_vits_config(
         "data": {
             "training_files": train_filelist,
             "validation_files": val_filelist,
-            "text_cleaners": ["korean_cleaners"],
+            "text_cleaners": pretrained_data.get("text_cleaners", ["korean_cleaners"]),
             "max_wav_value": 32768.0,
             "sampling_rate": sampling_rate,
             "filter_length": 1024,
@@ -114,29 +131,30 @@ def build_vits_config(
             "n_mel_channels": 80,
             "mel_fmin": 0.0,
             "mel_fmax": None,
-            "add_blank": True,
-            "n_speakers": 0,
-            "cleaned_text": False
+            "add_blank": pretrained_data.get("add_blank", True),
+            "n_speakers": n_speakers,
+            "cleaned_text": pretrained_data.get("cleaned_text", False)
         },
         "model": {
-            "inter_channels": 128,
-            "hidden_channels": 192,
-            "filter_channels": 768,
-            "n_heads": 2,
-            "n_layers": 6,
-            "kernel_size": 3,
-            "p_dropout": 0.1,
-            "resblock": "1",
-            "resblock_kernel_sizes": [3, 7, 11],
-            "resblock_dilation_sizes": [[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-            "upsample_rates": [8, 8, 2, 2],
-            "upsample_initial_channel": 512,
-            "upsample_kernel_sizes": [16, 16, 4, 4],
-            "n_layers_q": 3,
-            "use_spectral_norm": False,
-            "gin_channels": 256
+            "inter_channels": pretrained_model.get("inter_channels", 128),
+            "hidden_channels": pretrained_model.get("hidden_channels", 192),
+            "filter_channels": pretrained_model.get("filter_channels", 768),
+            "n_heads": pretrained_model.get("n_heads", 2),
+            "n_layers": pretrained_model.get("n_layers", 6),
+            "kernel_size": pretrained_model.get("kernel_size", 3),
+            "p_dropout": pretrained_model.get("p_dropout", 0.1),
+            "resblock": pretrained_model.get("resblock", "1"),
+            "resblock_kernel_sizes": pretrained_model.get("resblock_kernel_sizes", [3, 7, 11]),
+            "resblock_dilation_sizes": pretrained_model.get("resblock_dilation_sizes", [[1, 3, 5], [1, 3, 5], [1, 3, 5]]),
+            "upsample_rates": pretrained_model.get("upsample_rates", [8, 8, 2, 2]),
+            "upsample_initial_channel": pretrained_model.get("upsample_initial_channel", 512),
+            "upsample_kernel_sizes": pretrained_model.get("upsample_kernel_sizes", [16, 16, 4, 4]),
+            "n_layers_q": pretrained_model.get("n_layers_q", 3),
+            "use_spectral_norm": pretrained_model.get("use_spectral_norm", False),
+            "gin_channels": pretrained_model.get("gin_channels", 256)
         },
-        "symbols": [
+        "speakers": pretrained_speakers if pretrained_speakers else ["speaker0"],
+        "symbols": pretrained_symbols if pretrained_symbols else [
             "_", ",", ".", "!", "?", "…", "~", "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ",
             "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ", "ㄲ", "ㄸ", "ㅃ", "ㅆ", "ㅉ", "ㅏ",
             "ㅓ", "ㅗ", "ㅜ", "ㅡ", "ㅣ", "ㅐ", "ㅔ", " "

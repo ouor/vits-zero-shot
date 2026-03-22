@@ -53,14 +53,23 @@ def load_model_checkpoint(checkpoint_path, model):
   else:
     state_dict = model.state_dict()
   new_state_dict = {}
+  skipped = []
   for k, v in state_dict.items():
-    new_state_dict[k] = saved_state_dict.get(k, v)
+    loaded = saved_state_dict.get(k)
+    if loaded is None or loaded.shape != v.shape:
+      new_state_dict[k] = v
+      if loaded is not None:
+        skipped.append(k)
+    else:
+      new_state_dict[k] = loaded
   if hasattr(model, 'module'):
     model.module.load_state_dict(new_state_dict)
   else:
     model.load_state_dict(new_state_dict)
   logger.info("Loaded model weights from '{}' (iteration {})".format(
     checkpoint_path, iteration))
+  if skipped:
+    logger.info("Skipped mismatched pretrained keys: {}".format(", ".join(skipped)))
   return model, iteration
 
 
