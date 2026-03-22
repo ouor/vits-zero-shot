@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..datasets import export_selected_corpus
 from ..training import run_training_command
-from ..vits_dataset import build_vits_config, export_vits_dataset
+from .vits_preparation import build_vits_config
 
 
 class VitsBackend:
@@ -17,7 +18,7 @@ class VitsBackend:
         trainer_config: dict,
     ) -> dict:
         vits_data_dir = run_root / "vits_data"
-        dataset_info = export_vits_dataset(
+        dataset_info = export_selected_corpus(
             selected_candidates=selected_candidates,
             output_dir=vits_data_dir,
             target_sample_rate=trainer_config["target_sample_rate"],
