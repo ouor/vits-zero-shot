@@ -115,7 +115,7 @@ def build_vits_config(
             "cleaned_text": False
         },
         "model": {
-            "inter_channels": 192,
+            "inter_channels": 128,
             "hidden_channels": 192,
             "filter_channels": 768,
             "n_heads": 2,

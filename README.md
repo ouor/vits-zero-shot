@@ -33,5 +33,5 @@ The main entry point will be:
 python3 scripts/run_pipeline.py --config configs/kim_haru_pipeline.json
 ```
 
-`configs/kim_haru_pipeline.json` includes a `vits.training_command` field.
-Set it to an installed VITS trainer command when you want the final training stage to run automatically.
+By default the repository trains its own compact VITS-style model locally.
+`vits.training_command` is optional and only needed if you want to replace that final trainer with a different command.
