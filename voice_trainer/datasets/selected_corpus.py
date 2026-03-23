@@ -39,7 +39,7 @@ def export_selected_corpus(
         wav_path = wav_dir / filename
         save_waveform(wav_path, waveform, target_sample_rate)
         candidate_language = candidate.get("language", language)
-        rows.append(f"{wav_path}|0|{candidate['text']}")
+        rows.append(f"{wav_path}|0|{candidate['text']}|{candidate_language}")
         manifest.append(
             {
                 "id": candidate["id"],

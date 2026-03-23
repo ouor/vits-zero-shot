@@ -39,7 +39,6 @@ class VitsBackend:
             pretrained_discriminator=trainer_config.get("pretrained_discriminator", ""),
             language=language,
             speaker_name=run_root.name,
-            manifest_path=dataset_info["manifest_path"],
             train_overrides=trainer_config.get("train", {}),
             data_overrides=trainer_config.get("data", {}),
             model_overrides=trainer_config.get("model", {}),
