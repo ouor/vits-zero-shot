@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import json
-import random
 from pathlib import Path
 
-from .audio import load_waveform, save_waveform, write_json
-from .full_vits import text as vits_text
+from ..vits import text as vits_text
 
 
 def _write_filelist(path: Path, rows: list[str]) -> None:
@@ -27,7 +25,7 @@ def _write_cleaned_filelist(path: Path, cleaner_names: list[str], text_index: in
     return cleaned_path
 
 
-def _load_pretrained_config(pretrained_generator: str) -> dict | None:
+def load_pretrained_vits_config(pretrained_generator: str) -> dict | None:
     if not pretrained_generator:
         return None
     config_path = Path(pretrained_generator).resolve().parent / "config.json"
@@ -35,68 +33,6 @@ def _load_pretrained_config(pretrained_generator: str) -> dict | None:
         return None
     with config_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
-
-
-def export_vits_dataset(
-    *,
-    selected_candidates: list[dict],
-    output_dir: Path,
-    target_sample_rate: int,
-    train_split_ratio: float,
-    random_seed: int = 1234,
-) -> dict:
-    if len(selected_candidates) < 2:
-        raise ValueError("VITS dataset export requires at least 2 selected candidates.")
-    if not 0.0 < train_split_ratio < 1.0:
-        raise ValueError("train_split_ratio must be between 0 and 1.")
-
-    dataset_dir = output_dir / "dataset"
-    wav_dir = dataset_dir / "wavs"
-    wav_dir.mkdir(parents=True, exist_ok=True)
-
-    rows = []
-    manifest = []
-    for index, candidate in enumerate(selected_candidates, start=1):
-        waveform, _ = load_waveform(candidate["wav_path"], sample_rate=target_sample_rate)
-        filename = f"sample_{index:04d}.wav"
-        wav_path = wav_dir / filename
-        save_waveform(wav_path, waveform, target_sample_rate)
-        rows.append(f"{wav_path}|0|{candidate['text']}")
-        manifest.append(
-            {
-                "id": candidate["id"],
-                "text": candidate["text"],
-                "speaker_similarity": candidate["speaker_similarity"],
-                "wav_path": str(wav_path),
-            }
-        )
-
-    rng = random.Random(random_seed)
-    rng.shuffle(rows)
-
-    split_index = max(1, int(len(rows) * train_split_ratio))
-    if split_index >= len(rows):
-        split_index = len(rows) - 1
-
-    train_rows = rows[:split_index]
-    val_rows = rows[split_index:]
-
-    filelists_dir = output_dir / "filelists"
-    train_filelist = filelists_dir / "train.txt"
-    val_filelist = filelists_dir / "val.txt"
-    _write_filelist(train_filelist, train_rows)
-    _write_filelist(val_filelist, val_rows)
-
-    manifest_path = output_dir / "selected_dataset.json"
-    write_json(manifest_path, {"items": manifest})
-
-    return {
-        "dataset_dir": str(dataset_dir),
-        "train_filelist": str(train_filelist),
-        "val_filelist": str(val_filelist),
-        "manifest_path": str(manifest_path),
-        "item_count": len(manifest),
-    }
 
 
 def build_vits_config(
@@ -110,7 +46,7 @@ def build_vits_config(
     pretrained_generator: str = "",
     pretrained_discriminator: str = "",
 ) -> dict:
-    pretrained_config = _load_pretrained_config(pretrained_generator)
+    pretrained_config = load_pretrained_vits_config(pretrained_generator)
     pretrained_data = pretrained_config.get("data", {}) if pretrained_config else {}
     pretrained_model = pretrained_config.get("model", {}) if pretrained_config else {}
     pretrained_symbols = pretrained_config.get("symbols") if pretrained_config else None
@@ -139,7 +75,7 @@ def build_vits_config(
             "c_mel": 45,
             "c_kl": 1.0,
             "pretrained_generator": pretrained_generator,
-            "pretrained_discriminator": pretrained_discriminator
+            "pretrained_discriminator": pretrained_discriminator,
         },
         "data": {
             "training_files": str(cleaned_train_filelist),
@@ -155,7 +91,7 @@ def build_vits_config(
             "mel_fmax": None,
             "add_blank": pretrained_data.get("add_blank", True),
             "n_speakers": n_speakers,
-            "cleaned_text": True
+            "cleaned_text": True,
         },
         "model": {
             "inter_channels": pretrained_model.get("inter_channels", 128),
@@ -173,14 +109,14 @@ def build_vits_config(
             "upsample_kernel_sizes": pretrained_model.get("upsample_kernel_sizes", [16, 16, 4, 4]),
             "n_layers_q": pretrained_model.get("n_layers_q", 3),
             "use_spectral_norm": pretrained_model.get("use_spectral_norm", False),
-            "gin_channels": pretrained_model.get("gin_channels", 256)
+            "gin_channels": pretrained_model.get("gin_channels", 256),
         },
         "speakers": pretrained_speakers if pretrained_speakers else ["speaker0"],
         "symbols": pretrained_symbols if pretrained_symbols else [
             "_", ",", ".", "!", "?", "…", "~", "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ",
             "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ", "ㄲ", "ㄸ", "ㅃ", "ㅆ", "ㅉ", "ㅏ",
-            "ㅓ", "ㅗ", "ㅜ", "ㅡ", "ㅣ", "ㅐ", "ㅔ", " "
-        ]
+            "ㅓ", "ㅗ", "ㅜ", "ㅡ", "ㅣ", "ㅐ", "ㅔ", " ",
+        ],
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

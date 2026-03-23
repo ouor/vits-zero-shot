@@ -1,5 +1,6 @@
 {
   "run_name": "kim_haru_v1",
+  "training_backend": "vits",
   "reference": {
     "audio_path": "sample/voice/kim_haru.wav",
     "text_path": "sample/voice/kim_haru.txt",
@@ -22,14 +23,16 @@
     "embedding_sample_rate": 16000,
     "device": "cuda"
   },
-  "vits": {
-    "target_sample_rate": 22050,
-    "train_split_ratio": 0.95,
-    "batch_size": 16,
-    "epochs": 10000,
-    "pretrained_generator": "",
-    "pretrained_discriminator": "",
-    "training_command": []
+  "backends": {
+    "vits": {
+      "target_sample_rate": 22050,
+      "train_split_ratio": 0.95,
+      "batch_size": 16,
+      "epochs": 10000,
+      "pretrained_generator": "",
+      "pretrained_discriminator": "",
+      "training_command": []
+    }
   },
   "output_root": "runs"
 }
