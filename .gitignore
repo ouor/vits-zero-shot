@@ -14,3 +14,5 @@ runs/
 pretrained_models/
 outputs/
 tmp/
+voice_trainer/full_vits/monotonic_align/build/
+voice_trainer/full_vits/monotonic_align/core.c

@@ -11,7 +11,10 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
   "cn2an",
   "cython",
+  "eng-to-ipa",
   "faster-qwen3-tts",
+  "inflect",
+  "indic-transliteration",
   "jamo",
   "jieba",
   "ko-pron",
