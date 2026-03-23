@@ -77,15 +77,15 @@ def _write_cleaned_filelist(
     cleaner_names: list[str],
     language: str,
     symbols: list[str],
+    language_lookup: dict[str, str] | None = None,
     text_index: int = 2,
-    language_index: int = 3,
 ) -> Path:
     cleaned_path = Path(str(path) + ".cleaned")
     rows = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             parts = line.rstrip("\n").split("|")
-            row_language = parts[language_index] if len(parts) > language_index else language
+            row_language = language_lookup.get(parts[0], language) if language_lookup else language
             adapted_text = _adapt_text_for_cleaners(parts[text_index], cleaner_names, row_language)
             cleaned_text = vits_text._clean_text(adapted_text, cleaner_names)
             _validate_cleaned_text(parts[text_index], cleaned_text, symbols)
@@ -141,6 +141,18 @@ def load_pretrained_vits_config(pretrained_generator: str) -> dict | None:
         return json.load(handle)
 
 
+def load_language_lookup(manifest_path: str | Path) -> dict[str, str]:
+    payload = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    items = payload.get("items", [])
+    lookup = {}
+    for item in items:
+        wav_path = item.get("wav_path")
+        item_language = item.get("language")
+        if isinstance(wav_path, str) and isinstance(item_language, str):
+            lookup[wav_path] = item_language
+    return lookup
+
+
 def _merged_dict(base: dict, overrides: dict | None) -> dict:
     if not overrides:
         return dict(base)
@@ -159,6 +171,7 @@ def build_vits_config(
     pretrained_discriminator: str = "",
     language: str,
     speaker_name: str,
+    manifest_path: str | None = None,
     train_overrides: dict | None = None,
     data_overrides: dict | None = None,
     model_overrides: dict | None = None,
@@ -173,8 +186,21 @@ def build_vits_config(
     )
     text_cleaners = pretrained_data.get("text_cleaners", ["korean_cleaners"])
     n_speakers = 1
-    cleaned_train_filelist = _write_cleaned_filelist(Path(train_filelist), text_cleaners, language, symbols)
-    cleaned_val_filelist = _write_cleaned_filelist(Path(val_filelist), text_cleaners, language, symbols)
+    language_lookup = load_language_lookup(manifest_path) if manifest_path else None
+    cleaned_train_filelist = _write_cleaned_filelist(
+        Path(train_filelist),
+        text_cleaners,
+        language,
+        symbols,
+        language_lookup=language_lookup,
+    )
+    cleaned_val_filelist = _write_cleaned_filelist(
+        Path(val_filelist),
+        text_cleaners,
+        language,
+        symbols,
+        language_lookup=language_lookup,
+    )
     data_config = _merged_dict(
         {
             "training_files": str(cleaned_train_filelist),
