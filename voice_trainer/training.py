@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 from .audio import write_json
-from .vits_train import train_vits
+from .full_vits.runtime import ensure_monotonic_align_built
 
 
 def run_training_command(
@@ -15,8 +16,24 @@ def run_training_command(
     output_dir: Path,
 ) -> None:
     if not training_command:
-        summary = train_vits(config_path, output_dir)
-        write_json(output_dir / "training_summary_wrapper.json", summary)
+        ensure_monotonic_align_built()
+        default_command = [
+            sys.executable,
+            "-m",
+            "voice_trainer.full_vits.train",
+            "-c",
+            str(config_path),
+            "-m",
+            str(output_dir),
+        ]
+        write_json(
+            output_dir / "training_command.json",
+            {
+                "command": default_command,
+                "shell_preview": " ".join(shlex.quote(part) for part in default_command),
+            },
+        )
+        subprocess.run(default_command, check=True)
         return
 
     resolved_command = [
