@@ -78,3 +78,10 @@ def generate_korean_sentences(target_count: int) -> list[str]:
                         if len(sentences) >= target_count:
                             return list(sentences.keys())
     return list(sentences.keys())
+
+
+def generate_sentences(language: str, target_count: int) -> list[str]:
+    normalized = language.strip().lower()
+    if normalized == "korean":
+        return generate_korean_sentences(target_count)
+    raise ValueError(f"Unsupported generation language: {language}")

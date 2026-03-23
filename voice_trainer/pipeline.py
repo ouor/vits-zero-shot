@@ -3,28 +3,29 @@ from __future__ import annotations
 from pathlib import Path
 
 from .audio import load_text, write_json
-from .config import load_config, resolve_from_root, resolve_paths
+from .config import load_config, resolve_from_root
 from .generation import generate_candidates
 from .ranking import rank_candidates
-from .text_corpus import generate_korean_sentences
+from .text_corpus import generate_sentences
 from .training import run_training_command
 from .vits_dataset import build_vits_config, export_vits_dataset
 
 
 def run_pipeline(config_path: str | Path) -> dict:
     config = load_config(config_path)
-    paths = resolve_paths()
 
     run_root = resolve_from_root(config["output_root"]) / config["run_name"]
     reference_audio = resolve_from_root(config["reference"]["audio_path"])
     reference_text = load_text(resolve_from_root(config["reference"]["text_path"]))
 
-    prompts = generate_korean_sentences(config["generation"]["candidate_count"])
+    prompts = generate_sentences(
+        config["reference"]["language"],
+        config["generation"]["candidate_count"],
+    )
     prompt_path = run_root / "prompts.json"
     write_json(prompt_path, {"prompts": prompts})
 
     candidates = generate_candidates(
-        paths=paths,
         output_dir=run_root / "generation",
         model_id=config["generation"]["model_id"],
         device=config["generation"]["device"],
@@ -65,6 +66,8 @@ def run_pipeline(config_path: str | Path) -> dict:
         batch_size=config["vits"]["batch_size"],
         epochs=config["vits"]["epochs"],
         sampling_rate=config["vits"]["target_sample_rate"],
+        pretrained_generator=config["vits"].get("pretrained_generator", ""),
+        pretrained_discriminator=config["vits"].get("pretrained_discriminator", ""),
     )
 
     run_training_command(

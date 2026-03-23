@@ -1,11 +1,24 @@
 """ from https://github.com/keithito/tacotron """
 from . import cleaners
-from .symbols import symbols
+from .symbols import symbols as default_symbols
 
 
-# Mappings from symbol to numeric ID and vice versa:
-_symbol_to_id = {s: i for i, s in enumerate(symbols)}
-_id_to_symbol = {i: s for i, s in enumerate(symbols)}
+symbols = list(default_symbols)
+_symbol_to_id = {}
+_id_to_symbol = {}
+
+
+def set_symbols(new_symbols):
+  global symbols
+  global _symbol_to_id
+  global _id_to_symbol
+
+  symbols = list(new_symbols)
+  _symbol_to_id = {s: i for i, s in enumerate(symbols)}
+  _id_to_symbol = {i: s for i, s in enumerate(symbols)}
+
+
+set_symbols(symbols)
 
 
 def text_to_sequence(text, cleaner_names):

@@ -43,6 +43,36 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
   return model, optimizer, learning_rate, iteration
 
 
+def load_model_checkpoint(checkpoint_path, model):
+  assert os.path.isfile(checkpoint_path)
+  checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
+  iteration = checkpoint_dict.get('iteration', 0)
+  saved_state_dict = checkpoint_dict['model']
+  if hasattr(model, 'module'):
+    state_dict = model.module.state_dict()
+  else:
+    state_dict = model.state_dict()
+  new_state_dict = {}
+  skipped = []
+  for k, v in state_dict.items():
+    loaded = saved_state_dict.get(k)
+    if loaded is None or loaded.shape != v.shape:
+      new_state_dict[k] = v
+      if loaded is not None:
+        skipped.append(k)
+    else:
+      new_state_dict[k] = loaded
+  if hasattr(model, 'module'):
+    model.module.load_state_dict(new_state_dict)
+  else:
+    model.load_state_dict(new_state_dict)
+  logger.info("Loaded model weights from '{}' (iteration {})".format(
+    checkpoint_path, iteration))
+  if skipped:
+    logger.info("Skipped mismatched pretrained keys: {}".format(", ".join(skipped)))
+  return model, iteration
+
+
 def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path):
   logger.info("Saving model and optimizer state at iteration {} to {}".format(
     iteration, checkpoint_path))
@@ -73,6 +103,14 @@ def latest_checkpoint_path(dir_path, regex="G_*.pth"):
   x = f_list[-1]
   print(x)
   return x
+
+
+def maybe_latest_checkpoint_path(dir_path, regex="G_*.pth"):
+  f_list = glob.glob(os.path.join(dir_path, regex))
+  if not f_list:
+    return None
+  f_list.sort(key=lambda f: int("".join(filter(str.isdigit, f))))
+  return f_list[-1]
 
 
 def plot_spectrogram_to_numpy(spectrogram):

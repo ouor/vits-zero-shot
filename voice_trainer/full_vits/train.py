@@ -21,8 +21,8 @@ logging.getLogger('numba').setLevel(logging.WARNING)
 from . import commons
 from . import utils
 from .data_utils import (
-  TextAudioLoader,
-  TextAudioCollate,
+  TextAudioSpeakerLoader,
+  TextAudioSpeakerCollate,
   DistributedBucketSampler
 )
 from .models import (
@@ -36,7 +36,7 @@ from .losses import (
   kl_loss
 )
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .text.symbols import symbols
+from . import text as vits_text
 
 
 torch.backends.cudnn.benchmark = True
@@ -44,19 +44,31 @@ global_step = 0
 
 
 def main():
-  """Assume Single Node Multi GPUs Training Only"""
+  """Default to single-GPU training and allow opt-in DDP."""
   assert torch.cuda.is_available(), "CPU training is not allowed."
 
-  n_gpus = torch.cuda.device_count()
-  os.environ['MASTER_ADDR'] = 'localhost'
-  os.environ['MASTER_PORT'] = '8000'
-
   hps = utils.get_hparams()
-  mp.spawn(run, nprocs=n_gpus, args=(n_gpus, hps,))
+  if hasattr(hps, "symbols"):
+    vits_text.set_symbols(hps.symbols)
+
+  available_gpus = torch.cuda.device_count()
+  requested_gpus = max(1, int(getattr(hps.train, "num_gpus", 1)))
+  n_gpus = min(available_gpus, requested_gpus)
+
+  if n_gpus > 1:
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '8000'
+    mp.spawn(run, nprocs=n_gpus, args=(n_gpus, hps,))
+    return
+
+  run(0, 1, hps)
 
 
 def run(rank, n_gpus, hps):
   global global_step
+  if hasattr(hps, "symbols"):
+    vits_text.set_symbols(hps.symbols)
+  use_ddp = n_gpus > 1
   if rank == 0:
     logger = utils.get_logger(hps.model_dir)
     logger.info(hps)
@@ -64,31 +76,44 @@ def run(rank, n_gpus, hps):
     writer = SummaryWriter(log_dir=hps.model_dir)
     writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
 
-  dist.init_process_group(backend='nccl', init_method='env://', world_size=n_gpus, rank=rank)
   torch.manual_seed(hps.train.seed)
   torch.cuda.set_device(rank)
+  if use_ddp:
+    dist.init_process_group(backend='nccl', init_method='env://', world_size=n_gpus, rank=rank)
 
-  train_dataset = TextAudioLoader(hps.data.training_files, hps.data)
-  train_sampler = DistributedBucketSampler(
-      train_dataset,
-      hps.train.batch_size,
-      [32,300,400,500,600,700,800,900,1000],
-      num_replicas=n_gpus,
-      rank=rank,
-      shuffle=True)
-  collate_fn = TextAudioCollate()
-  train_loader = DataLoader(train_dataset, num_workers=8, shuffle=False, pin_memory=True,
-      collate_fn=collate_fn, batch_sampler=train_sampler)
+  train_dataset = TextAudioSpeakerLoader(hps.data.training_files, hps.data)
+  collate_fn = TextAudioSpeakerCollate()
+  if use_ddp:
+    train_sampler = DistributedBucketSampler(
+        train_dataset,
+        hps.train.batch_size,
+        [32,300,400,500,600,700,800,900,1000],
+        num_replicas=n_gpus,
+        rank=rank,
+        shuffle=True)
+    train_loader = DataLoader(train_dataset, num_workers=8, shuffle=False, pin_memory=True,
+        collate_fn=collate_fn, batch_sampler=train_sampler)
+  else:
+    train_loader = DataLoader(
+        train_dataset,
+        num_workers=0,
+        shuffle=True,
+        pin_memory=True,
+        batch_size=hps.train.batch_size,
+        drop_last=False,
+        collate_fn=collate_fn,
+    )
   if rank == 0:
-    eval_dataset = TextAudioLoader(hps.data.validation_files, hps.data)
-    eval_loader = DataLoader(eval_dataset, num_workers=8, shuffle=False,
+    eval_dataset = TextAudioSpeakerLoader(hps.data.validation_files, hps.data)
+    eval_loader = DataLoader(eval_dataset, num_workers=0, shuffle=False,
         batch_size=hps.train.batch_size, pin_memory=True,
         drop_last=False, collate_fn=collate_fn)
 
   net_g = SynthesizerTrn(
-      len(symbols),
+      len(vits_text.symbols),
       hps.data.filter_length // 2 + 1,
       hps.train.segment_size // hps.data.hop_length,
+      n_speakers=hps.data.n_speakers,
       **hps.model).cuda(rank)
   net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm).cuda(rank)
   optim_g = torch.optim.AdamW(
@@ -101,16 +126,28 @@ def run(rank, n_gpus, hps):
       hps.train.learning_rate, 
       betas=hps.train.betas, 
       eps=hps.train.eps)
-  net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
-  net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
+  if use_ddp:
+    net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
+    net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
 
-  try:
-    _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g)
-    _, _, _, epoch_str = utils.load_checkpoint(utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d)
+  epoch_str = 1
+  global_step = 0
+
+  generator_resume_path = utils.maybe_latest_checkpoint_path(hps.model_dir, "G_*.pth")
+  discriminator_resume_path = utils.maybe_latest_checkpoint_path(hps.model_dir, "D_*.pth")
+  pretrained_g = getattr(hps.train, "pretrained_generator", "")
+  pretrained_d = getattr(hps.train, "pretrained_discriminator", "")
+
+  if generator_resume_path:
+    _, _, _, epoch_str = utils.load_checkpoint(generator_resume_path, net_g, optim_g)
     global_step = (epoch_str - 1) * len(train_loader)
-  except:
-    epoch_str = 1
-    global_step = 0
+  elif pretrained_g:
+    utils.load_model_checkpoint(pretrained_g, net_g)
+
+  if discriminator_resume_path:
+    _, _, _, _ = utils.load_checkpoint(discriminator_resume_path, net_d, optim_d)
+  elif pretrained_d:
+    utils.load_model_checkpoint(pretrained_d, net_d)
 
   scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)
   scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=hps.train.lr_decay, last_epoch=epoch_str-2)
@@ -125,6 +162,9 @@ def run(rank, n_gpus, hps):
     scheduler_g.step()
     scheduler_d.step()
 
+  if use_ddp:
+    dist.destroy_process_group()
+
 
 def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers):
   net_g, net_d = nets
@@ -134,19 +174,21 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
   if writers is not None:
     writer, writer_eval = writers
 
-  train_loader.batch_sampler.set_epoch(epoch)
+  if hasattr(train_loader, "batch_sampler") and hasattr(train_loader.batch_sampler, "set_epoch"):
+    train_loader.batch_sampler.set_epoch(epoch)
   global global_step
 
   net_g.train()
   net_d.train()
-  for batch_idx, (x, x_lengths, spec, spec_lengths, y, y_lengths) in enumerate(train_loader):
+  for batch_idx, (x, x_lengths, spec, spec_lengths, y, y_lengths, speakers) in enumerate(train_loader):
     x, x_lengths = x.cuda(rank, non_blocking=True), x_lengths.cuda(rank, non_blocking=True)
     spec, spec_lengths = spec.cuda(rank, non_blocking=True), spec_lengths.cuda(rank, non_blocking=True)
     y, y_lengths = y.cuda(rank, non_blocking=True), y_lengths.cuda(rank, non_blocking=True)
+    speakers = speakers.cuda(rank, non_blocking=True)
 
     with autocast(enabled=hps.train.fp16_run):
       y_hat, l_length, attn, ids_slice, x_mask, z_mask,\
-      (z, z_p, m_p, logs_p, m_q, logs_q) = net_g(x, x_lengths, spec, spec_lengths)
+      (z, z_p, m_p, logs_p, m_q, logs_q) = net_g(x, x_lengths, spec, spec_lengths, speakers)
 
       mel = spec_to_mel_torch(
           spec, 
@@ -242,12 +284,14 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
 
  
 def evaluate(hps, generator, eval_loader, writer_eval):
+    generator_model = generator.module if hasattr(generator, "module") else generator
     generator.eval()
     with torch.no_grad():
-      for batch_idx, (x, x_lengths, spec, spec_lengths, y, y_lengths) in enumerate(eval_loader):
+      for batch_idx, (x, x_lengths, spec, spec_lengths, y, y_lengths, speakers) in enumerate(eval_loader):
         x, x_lengths = x.cuda(0), x_lengths.cuda(0)
         spec, spec_lengths = spec.cuda(0), spec_lengths.cuda(0)
         y, y_lengths = y.cuda(0), y_lengths.cuda(0)
+        speakers = speakers.cuda(0)
 
         # remove else
         x = x[:1]
@@ -256,8 +300,9 @@ def evaluate(hps, generator, eval_loader, writer_eval):
         spec_lengths = spec_lengths[:1]
         y = y[:1]
         y_lengths = y_lengths[:1]
+        speakers = speakers[:1]
         break
-      y_hat, attn, mask, *_ = generator.module.infer(x, x_lengths, max_len=1000)
+      y_hat, attn, mask, *_ = generator_model.infer(x, x_lengths, sid=speakers, max_len=1000)
       y_hat_lengths = mask.sum([1,2]).long() * hps.data.hop_length
 
       mel = spec_to_mel_torch(

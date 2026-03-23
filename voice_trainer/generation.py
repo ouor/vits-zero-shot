@@ -3,12 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from .audio import save_waveform, write_jsonl
-from .config import PipelinePaths
 
 
 def generate_candidates(
     *,
-    paths: PipelinePaths,
     output_dir: Path,
     model_id: str,
     device: str,
@@ -23,7 +21,6 @@ def generate_candidates(
     non_streaming_mode: bool,
     max_new_tokens: int,
 ) -> list[dict]:
-    del paths
     import torch
     from faster_qwen3_tts import FasterQwen3TTS  # pylint: disable=import-error
 
