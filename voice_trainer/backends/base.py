@@ -13,6 +13,7 @@ class TrainingBackend(Protocol):
         run_root: Path,
         selected_candidates: list[dict],
         trainer_config: dict,
+        language: str,
     ) -> dict:
         """Prepare backend-specific dataset and config artifacts."""
 

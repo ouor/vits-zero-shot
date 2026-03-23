@@ -1,5 +1,5 @@
 {
-  "run_name": "cjke_cleaners2_smoke_pretrained_g",
+  "run_name": "cjke_cleaners2",
   "training_backend": "vits",
   "reference": {
     "audio_path": "sample/voice/kim_haru.wav",
@@ -7,8 +7,14 @@
     "language": "Korean"
   },
   "generation": {
-    "candidate_count": 10,
-    "selection_count": 5,
+    "candidate_count": 600,
+    "selection_count": 300,
+    "prompt_languages": [
+      { "language": "korean", "weight": 0.4 },
+      { "language": "english", "weight": 0.2 },
+      { "language": "japanese", "weight": 0.2 },
+      { "language": "chinese", "weight": 0.2 }
+    ],
     "model_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
     "device": "cuda",
     "temperature": 0.9,
@@ -26,9 +32,9 @@
   "backends": {
     "vits": {
       "target_sample_rate": 22050,
-      "train_split_ratio": 0.8,
-      "batch_size": 2,
-      "epochs": 2,
+      "train_split_ratio": 0.95,
+      "batch_size": 16,
+      "epochs": 10000,
       "pretrained_generator": "sample/pretrained/cjke_cleaners2/G_0.pth",
       "pretrained_discriminator": "",
       "training_command": []

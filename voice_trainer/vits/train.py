@@ -3,6 +3,7 @@ import json
 import argparse
 import itertools
 import math
+import time
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
@@ -78,6 +79,13 @@ def run(rank, n_gpus, hps):
 
   torch.manual_seed(hps.train.seed)
   torch.cuda.set_device(rank)
+  if rank == 0:
+    logger.info(
+      "cuda device=%s name=%s total_mem_mb=%.1f",
+      rank,
+      torch.cuda.get_device_name(rank),
+      torch.cuda.get_device_properties(rank).total_memory / (1024 * 1024),
+    )
   if use_ddp:
     dist.init_process_group(backend='nccl', init_method='env://', world_size=n_gpus, rank=rank)
 
@@ -180,6 +188,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
 
   net_g.train()
   net_d.train()
+  step_started_at = time.perf_counter()
   for batch_idx, (x, x_lengths, spec, spec_lengths, y, y_lengths, speakers) in enumerate(train_loader):
     x, x_lengths = x.cuda(rank, non_blocking=True), x_lengths.cuda(rank, non_blocking=True)
     spec, spec_lengths = spec.cuda(rank, non_blocking=True), spec_lengths.cuda(rank, non_blocking=True)
@@ -243,11 +252,32 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
     if rank==0:
       if global_step % hps.train.log_interval == 0:
         lr = optim_g.param_groups[0]['lr']
-        losses = [loss_disc, loss_gen, loss_fm, loss_mel, loss_dur, loss_kl]
-        logger.info('Train Epoch: {} [{:.0f}%]'.format(
+        step_time_ms = (time.perf_counter() - step_started_at) * 1000
+        cuda_allocated_mb = torch.cuda.memory_allocated(rank) / (1024 * 1024)
+        cuda_reserved_mb = torch.cuda.memory_reserved(rank) / (1024 * 1024)
+        cuda_max_allocated_mb = torch.cuda.max_memory_allocated(rank) / (1024 * 1024)
+        logger.info(
+          "train epoch=%s/%s step=%s batch=%s/%s progress=%.0f%% lr=%.6g "
+          "loss_d=%.4f loss_g=%.4f loss_fm=%.4f loss_mel=%.4f loss_dur=%.4f loss_kl=%.4f "
+          "step_time_ms=%.1f cuda_allocated_mb=%.1f cuda_reserved_mb=%.1f cuda_max_allocated_mb=%.1f",
           epoch,
-          100. * batch_idx / len(train_loader)))
-        logger.info([x.item() for x in losses] + [global_step, lr])
+          hps.train.epochs,
+          global_step,
+          batch_idx + 1,
+          len(train_loader),
+          100. * batch_idx / len(train_loader),
+          lr,
+          loss_disc.item(),
+          loss_gen.item(),
+          loss_fm.item(),
+          loss_mel.item(),
+          loss_dur.item(),
+          loss_kl.item(),
+          step_time_ms,
+          cuda_allocated_mb,
+          cuda_reserved_mb,
+          cuda_max_allocated_mb,
+        )
         
         scalar_dict = {"loss/g/total": loss_gen_all, "loss/d/total": loss_disc_all, "learning_rate": lr, "grad_norm_d": grad_norm_d, "grad_norm_g": grad_norm_g}
         scalar_dict.update({"loss/g/fm": loss_fm, "loss/g/mel": loss_mel, "loss/g/dur": loss_dur, "loss/g/kl": loss_kl})
@@ -268,6 +298,13 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
           scalars=scalar_dict)
 
       if global_step % hps.train.eval_interval == 0:
+        logger.info(
+          "eval step=%s epoch=%s/%s validation_batches=%s",
+          global_step,
+          epoch,
+          hps.train.epochs,
+          len(eval_loader),
+        )
         evaluate(hps, net_g, eval_loader, writer_eval)
         utils.save_checkpoint(net_g, optim_g, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, "G_{}.pth".format(global_step)))
         utils.save_checkpoint(net_d, optim_d, hps.train.learning_rate, epoch, os.path.join(hps.model_dir, "D_{}.pth".format(global_step)))
@@ -278,9 +315,10 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
         if os.path.exists(old_d):
           os.remove(old_d)
     global_step += 1
+    step_started_at = time.perf_counter()
   
   if rank == 0:
-    logger.info('====> Epoch: {}'.format(epoch))
+    logger.info('epoch completed epoch=%s/%s', epoch, hps.train.epochs)
 
  
 def evaluate(hps, generator, eval_loader, writer_eval):

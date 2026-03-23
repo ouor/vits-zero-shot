@@ -39,7 +39,7 @@ The project targets Python 3.11 because the current `faster-qwen3-tts` dependenc
 The main entry point is:
 
 ```bash
-uv run voice-trainer-run --config configs/kim_haru_pipeline.json
+uv run voice-trainer-run --config configs/korean_cleaners.json
 ```
 
 ## Config Shape
@@ -60,7 +60,49 @@ Top-level pipeline settings are separated from backend-specific trainer settings
 
 The pipeline still accepts the legacy top-level `vits` block, but new configs should use `backends.vits`.
 
+`generation.prompt_languages` controls which corpora are sampled for candidate prompts.
+The `cjke_cleaners2` configs mix Korean, English, Japanese, and Chinese prompts, while the
+`korean_cleaners` configs explicitly stay Korean-only.
+
 ## Backends
 
 By default the repository trains the vendored local VITS implementation through the `vits` backend.
 `backends.vits.training_command` is optional and only needed if you want to replace that final trainer with a different command.
+
+### VITS Override Shape
+
+The VITS backend still accepts the existing shortcut keys such as `batch_size`, `epochs`,
+`pretrained_generator`, and `pretrained_discriminator`. If you want to control fields that
+normally appear in the generated `training/config.json`, add nested `train`, `data`, or `model`
+override blocks under `backends.vits`.
+
+```json
+{
+  "backends": {
+    "vits": {
+      "target_sample_rate": 22050,
+      "train_split_ratio": 0.8,
+      "batch_size": 2,
+      "epochs": 50,
+      "pretrained_generator": "sample/pretrained/cjke_cleaners2/G_0.pth",
+      "train": {
+        "log_interval": 50,
+        "eval_interval": 200,
+        "num_gpus": 1,
+        "fp16_run": true
+      },
+      "data": {
+        "filter_length": 1024,
+        "hop_length": 256,
+        "win_length": 1024
+      },
+      "model": {
+        "gin_channels": 256
+      }
+    }
+  }
+}
+```
+
+Pipeline-generated file paths such as `training_files` and `validation_files` are still managed
+by the backend and are not expected to be overridden from the top-level pipeline config.

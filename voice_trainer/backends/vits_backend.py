@@ -16,6 +16,7 @@ class VitsBackend:
         run_root: Path,
         selected_candidates: list[dict],
         trainer_config: dict,
+        language: str,
     ) -> dict:
         vits_data_dir = run_root / "vits_data"
         dataset_info = export_selected_corpus(
@@ -23,6 +24,7 @@ class VitsBackend:
             output_dir=vits_data_dir,
             target_sample_rate=trainer_config["target_sample_rate"],
             train_split_ratio=trainer_config["train_split_ratio"],
+            language=language,
         )
 
         config_path = vits_data_dir / "vits_config.json"
@@ -35,6 +37,13 @@ class VitsBackend:
             sampling_rate=trainer_config["target_sample_rate"],
             pretrained_generator=trainer_config.get("pretrained_generator", ""),
             pretrained_discriminator=trainer_config.get("pretrained_discriminator", ""),
+            language=language,
+            speaker_name=run_root.name,
+            manifest_path=dataset_info["manifest_path"],
+            train_overrides=trainer_config.get("train", {}),
+            data_overrides=trainer_config.get("data", {}),
+            model_overrides=trainer_config.get("model", {}),
+            symbols_override=trainer_config.get("symbols"),
         )
 
         return {

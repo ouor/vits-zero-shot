@@ -30,6 +30,7 @@ dependencies = [
   "soundfile",
   "speechbrain",
   "tensorboard",
+  "tqdm",
   "torch",
   "torchaudio",
   "unidecode",

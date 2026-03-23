@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import gc
 from pathlib import Path
 
 import torch
 import torch.nn.functional as F
+from tqdm.auto import tqdm
 
 from .audio import load_waveform, write_json, write_jsonl
 
@@ -50,19 +52,30 @@ def rank_candidates(
         savedir=str(output_dir / "pretrained_speaker_model"),
     )
 
-    reference_embedding = _compute_embedding(classifier, reference_audio, sample_rate)
-    ranked = []
-    for candidate in candidates:
-        candidate_embedding = _compute_embedding(
-            classifier,
-            Path(candidate["wav_path"]),
-            sample_rate,
-        )
-        score = F.cosine_similarity(
-            reference_embedding.unsqueeze(0),
-            candidate_embedding.unsqueeze(0),
-        ).item()
-        ranked.append({**candidate, "speaker_similarity": score})
+    try:
+        reference_embedding = _compute_embedding(classifier, reference_audio, sample_rate)
+        ranked = []
+        progress = tqdm(candidates, desc="Speaker Ranking", unit="utt")
+        best_score = None
+        for candidate in progress:
+            candidate_embedding = _compute_embedding(
+                classifier,
+                Path(candidate["wav_path"]),
+                sample_rate,
+            )
+            score = F.cosine_similarity(
+                reference_embedding.unsqueeze(0),
+                candidate_embedding.unsqueeze(0),
+            ).item()
+            if best_score is None or score > best_score:
+                best_score = score
+            progress.set_postfix(best=f"{best_score:.4f}", last=f"{score:.4f}")
+            ranked.append({**candidate, "speaker_similarity": score})
+    finally:
+        del classifier
+        gc.collect()
+        if device.startswith("cuda") and torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     ranked.sort(key=lambda item: item["speaker_similarity"], reverse=True)
     selected = ranked[:selection_count]
