@@ -1,30 +1,19 @@
 # Voice Trainer Pipeline
 
-This repository builds a reproducible single-sample voice-training pipeline guided by three local reference repositories:
+A reproducible single-sample voice cloning and fine-tuning pipeline. Given one reference audio clip and its transcript, it synthesizes a large set of voice-cloned candidate utterances, filters them by speaker similarity, and uses the best ones to fine-tune a local VITS TTS model.
 
-- `./.ref/faster-qwen3-tts`: design reference for voice cloning candidate generation
-- `./.ref/speechbrain`: design reference for speaker embedding extraction and ranking
-- `./.ref/vits`: design reference for small TTS preprocessing and training
+## How it works
 
-The runtime pipeline in this repository does not import or execute code from `./.ref`.
-
-## Pipeline
-
-1. Read one reference waveform and its transcript.
-2. Generate a large Korean sentence set.
-3. Synthesize candidate utterances with voice cloning.
-4. Compute speaker embeddings for the reference and candidates.
-5. Keep the top-N candidates by cosine similarity.
-6. Export the selected subset as a reusable training corpus.
-7. Let the selected training backend prepare its own assets and train from reproducible config files.
-
-## Current Assumptions
-
-- Input is a single Korean reference clip plus one Korean transcript.
-- Candidate prompts are generated locally from templates in this repository.
-- Candidate ranking uses SpeechBrain ECAPA embeddings and cosine similarity.
-- The default backend is the vendored local VITS implementation.
-- The current VITS path uses the multi-speaker model structure while assigning a single selected speaker id in the exported corpus.
+```
+Reference audio + transcript
+         │
+         ▼  1. Prompt generation   — sample Korean / multilingual sentences
+         ▼  2. Candidate generation — voice-clone each sentence (FasterQwen3TTS)
+         ▼  3. Speaker ranking      — ECAPA-TDNN cosine similarity → keep top-N
+         ▼  4. Data preparation     — export to VITS dataset format
+         ▼  5. Training             — fine-tune vendored VITS model
+         ▼  6. Summary              — events.jsonl + result JSON
+```
 
 ## Setup
 
@@ -32,17 +21,67 @@ The runtime pipeline in this repository does not import or execute code from `./
 uv sync
 ```
 
-The project targets Python 3.11 because the current `faster-qwen3-tts` dependency chain pulls `onnxruntime`, which does not provide Python 3.10 wheels for this environment.
+> Requires Python 3.11–3.12. The `faster-qwen3-tts` dependency chain pulls `onnxruntime`, which does not provide Python 3.10 wheels for this environment.
 
-## Usage
+To use the Gradio demo, also install the optional dependency:
 
-The main entry point is:
+```bash
+uv pip install ".[demo]"
+```
+
+## Training pipeline
 
 ```bash
 uv run voice-trainer-run --config configs/korean_cleaners.json
 ```
 
-## Config Shape
+## Gradio demo
+
+Run a web UI against any trained VITS generator checkpoint:
+
+```bash
+uv run demo-vits-run \
+  --model sample/pretrained/korean_cleaners/G_0.pth \
+  --config sample/pretrained/korean_cleaners/config.json
+```
+
+| Option | Description |
+|--------|-------------|
+| `--model PATH` | Generator checkpoint (`G_*.pth`) |
+| `--config PATH` | Matching `config.json` |
+| `--device DEVICE` | `cuda` / `cpu` — auto-detected if omitted |
+| `--port PORT` | Local port (default: 7860) |
+| `--share` | Create a public Gradio share link |
+
+For multi-speaker models the UI shows a speaker dropdown derived from the `speakers` list in `config.json`.
+
+## Python inference API
+
+```python
+from voice_trainer.vits.inference import VitsInference
+import soundfile as sf
+
+tts = VitsInference(
+    generator_path="sample/pretrained/korean_cleaners/G_0.pth",
+    config_path="sample/pretrained/korean_cleaners/config.json",
+)
+audio = tts.synthesize("안녕하세요", speaker_id=0)
+sf.write("output.wav", audio, tts.sampling_rate)
+```
+
+`synthesize()` parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `text` | — | Raw input text; cleaners applied internally |
+| `speaker_id` | `0` | Speaker index for multi-speaker models |
+| `noise_scale` | `0.667` | Latent flow variation |
+| `noise_scale_w` | `0.8` | Duration predictor variation |
+| `length_scale` | `1.0` | Phoneme duration multiplier (>1 = slower) |
+
+The cleaner and symbol set are loaded automatically from `config.json`.
+
+## Config shape
 
 Top-level pipeline settings are separated from backend-specific trainer settings:
 
@@ -61,20 +100,19 @@ Top-level pipeline settings are separated from backend-specific trainer settings
 The pipeline still accepts the legacy top-level `vits` block, but new configs should use `backends.vits`.
 
 `generation.prompt_languages` controls which corpora are sampled for candidate prompts.
-The `cjke_cleaners2` configs mix Korean, English, Japanese, and Chinese prompts, while the
-`korean_cleaners` configs explicitly stay Korean-only.
+The `cjke_cleaners2` configs mix Korean, English, Japanese, and Chinese prompts; the
+`korean_cleaners` configs stay Korean-only.
 
 ## Backends
 
 By default the repository trains the vendored local VITS implementation through the `vits` backend.
-`backends.vits.training_command` is optional and only needed if you want to replace that final trainer with a different command.
+`backends.vits.training_command` is optional and only needed to replace the final trainer with a custom command.
 
-### VITS Override Shape
+### VITS override shape
 
-The VITS backend still accepts the existing shortcut keys such as `batch_size`, `epochs`,
-`pretrained_generator`, and `pretrained_discriminator`. If you want to control fields that
-normally appear in the generated `training/config.json`, add nested `train`, `data`, or `model`
-override blocks under `backends.vits`.
+The VITS backend accepts shortcut keys (`batch_size`, `epochs`, `pretrained_generator`,
+`pretrained_discriminator`) as well as nested `train`, `data`, and `model` blocks for
+fine-grained control over the generated `training/config.json`.
 
 ```json
 {
@@ -104,5 +142,4 @@ override blocks under `backends.vits`.
 }
 ```
 
-Pipeline-generated file paths such as `training_files` and `validation_files` are still managed
-by the backend and are not expected to be overridden from the top-level pipeline config.
+Pipeline-generated paths (`training_files`, `validation_files`) are managed by the backend and should not be overridden from the top-level config.

@@ -34,11 +34,16 @@ dependencies = [
   "torch",
   "torchaudio",
   "unidecode",
+  "gradio>=6.9.0",
 ]
 
 [project.scripts]
 voice-trainer-run = "voice_trainer.pipeline_cli:main"
 voice-trainer-train-vits = "voice_trainer.vits_cli:main"
+demo-vits-run = "voice_trainer.demo_cli:main"
+
+[project.optional-dependencies]
+demo = ["gradio"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["voice_trainer"]

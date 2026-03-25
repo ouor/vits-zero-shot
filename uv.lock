@@ -2225,6 +2225,7 @@ dependencies = [
     { name = "cython" },
     { name = "eng-to-ipa" },
     { name = "faster-qwen3-tts" },
+    { name = "gradio" },
     { name = "indic-transliteration" },
     { name = "inflect" },
     { name = "jamo" },
@@ -2248,12 +2249,19 @@ dependencies = [
     { name = "unidecode" },
 ]
 
+[package.optional-dependencies]
+demo = [
+    { name = "gradio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "cn2an" },
     { name = "cython" },
     { name = "eng-to-ipa" },
     { name = "faster-qwen3-tts" },
+    { name = "gradio", specifier = ">=6.9.0" },
+    { name = "gradio", marker = "extra == 'demo'" },
     { name = "indic-transliteration" },
     { name = "inflect" },
     { name = "jamo" },
@@ -2276,6 +2284,7 @@ requires-dist = [
     { name = "tqdm" },
     { name = "unidecode" },
 ]
+provides-extras = ["demo"]
 
 [[package]]
 name = "werkzeug"
